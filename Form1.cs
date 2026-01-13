@@ -3,6 +3,8 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using System.IO; // Dosya işlemleri için gerekli
+using IWshRuntimeLibrary; // Referans ekledikten sonra kullanabilirsiniz
 
 namespace crosshair
 {
@@ -66,3 +68,24 @@ namespace crosshair
         protected override void OnLoad(EventArgs e) { base.OnLoad(e); SetWindowLong(this.Handle, -20, GetWindowLong(this.Handle, -20) | 0x80000 | 0x20); }
     }
 }
+
+private void CreateShortcut()
+{
+    string shortcutPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Crosshair.lnk");
+
+    if (!System.IO.File.Exists(shortcutPath))
+    {
+        WshShell shell = new WshShell();
+        IWshShortcut shortcut = (IWshShortcut)shell.CreateShortcut(shortcutPath);
+
+        shortcut.Description = "Crosshair Uygulaması";
+        shortcut.TargetPath = Application.ExecutablePath; // Programın şu anki konumu
+        shortcut.WorkingDirectory = Application.StartupPath;
+        shortcut.Save();
+    }
+}
+
+
+
+
+
