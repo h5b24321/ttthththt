@@ -3,85 +3,96 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using System.IO; // Kısayol yolu için gerekli
+using IWshRuntimeLibrary; // COM Referansını eklemiş olmalısın
 
 namespace crosshair
 {
-    public partial class FormAyarlar : Form
+    public partial class Form1 : Form
     {
-        [DllImport("user32.dll")] public static extern bool ReleaseCapture();
-        [DllImport("user32.dll")] public static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
+        public static Color CColor = Color.Lime;
+        public static int CSize = 12, CThick = 2, CGap = 5, CMode = 0; 
+        public static bool COutline = true;
 
-        public FormAyarlar()
+        [DllImport("user32.dll")]
+        static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+        [DllImport("user32.dll")]
+        static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+        public Form1()
         {
-            this.Size = new Size(420, 600);
+            InitializeComponent(); // Eğer designer kullanıyorsan bu kalmalı
+            
             this.FormBorderStyle = FormBorderStyle.None;
-            this.BackColor = Color.FromArgb(15, 15, 18);
-            this.StartPosition = FormStartPosition.CenterScreen;
             this.TopMost = true;
+            this.BackColor = Color.Black;
+            this.TransparencyKey = Color.Black;
+            this.WindowState = FormWindowState.Maximized;
+            this.ShowInTaskbar = false;
 
-            // --- MODERN HEADER (SÜRÜKLEME) ---
-            Panel head = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = Color.FromArgb(25, 25, 30), Parent = this };
-            head.MouseDown += (s, e) => { ReleaseCapture(); SendMessage(this.Handle, 0xA1, 0x2, 0); };
+            // Kısayol oluşturma fonksiyonunu burada çağırıyoruz
+            try { CreateShortcut(); } catch { }
 
-            Label l = new Label { Text = "CRYSTAL CORE v5", ForeColor = Color.FromArgb(0, 255, 200), Font = new Font("Segoe UI", 12, FontStyle.Bold), Left = 15, Top = 12, AutoSize = true, Parent = head };
-            l.MouseDown += (s, e) => { ReleaseCapture(); SendMessage(this.Handle, 0xA1, 0x2, 0); };
-
-            Button close = new Button { Text = "✕", Dock = DockStyle.Right, Width = 50, FlatStyle = FlatStyle.Flat, ForeColor = Color.White, Parent = head };
-            close.FlatAppearance.BorderSize = 0; close.Click += (s, e) => Application.Exit();
-
-            // --- MOD SEÇİCİLER (CUSTOM TABS) ---
-            int y = 70;
-            string[] modes = { "PLUS", "DOT", "BOX", "T-STYLE" };
-            for (int i = 0; i < modes.Length; i++)
-            {
-                Button b = new Button
-                {
-                    Text = modes[i],
-                    Left = 20 + (i * 95),
-                    Top = y,
-                    Width = 90,
-                    Height = 40,
-                    FlatStyle = FlatStyle.Flat,
-                    ForeColor = Color.White,
-                    BackColor = Color.FromArgb(35, 35, 40),
-                    Font = new Font("Segoe UI", 8, FontStyle.Bold),
-                    Parent = this
-                };
-                b.FlatAppearance.BorderColor = Color.FromArgb(0, 255, 200);
-                int idx = i; b.Click += (s, e) => { Form1.CMode = idx; RefreshX(); };
-            }
-
-            // --- AYARLAR (CUSTOM SLIDERS) ---
-            y = 140;
-            AddProSlider("UZUNLUK (LENGTH)", 2, 60, Form1.CSize, ref y, (v) => Form1.CSize = v);
-            AddProSlider("KALINLIK (THICK)", 1, 15, Form1.CThick, ref y, (v) => Form1.CThick = v);
-            AddProSlider("BOŞLUK (GAP)", 0, 40, Form1.CGap, ref y, (v) => Form1.CGap = v);
-
-            // --- RENK PALETİ ---
-            Label lc = new Label { Text = "RENK PROFİLLERİ", Top = y + 10, Left = 25, ForeColor = Color.FromArgb(0, 255, 200), Font = new Font("Segoe UI", 9, FontStyle.Bold), Parent = this };
-            FlowLayoutPanel flow = new FlowLayoutPanel { Left = 20, Top = y + 35, Size = new Size(380, 100), Parent = this };
-            Color[] colors = { Color.Lime, Color.Red, Color.Cyan, Color.Yellow, Color.White, Color.Magenta, Color.Orange, Color.DeepSkyBlue };
-            foreach (Color c in colors)
-            {
-                Button cb = new Button { BackColor = c, Size = new Size(42, 42), FlatStyle = FlatStyle.Flat, Parent = flow };
-                cb.FlatAppearance.BorderSize = 0;
-                cb.Click += (s, e) => { Form1.CColor = ((Button)s).BackColor; RefreshX(); };
-            }
+            new FormAyarlar().Show();
         }
 
-        private void AddProSlider(string name, int min, int max, int val, ref int y, Action<int> act)
+        private void CreateShortcut()
         {
-            Label l = new Label { Text = name, Top = y, Left = 25, ForeColor = Color.Gray, Font = new Font("Segoe UI", 8, FontStyle.Bold), Parent = this };
-            TrackBar tb = new TrackBar { Left = 20, Top = y + 20, Width = 370, Minimum = min, Maximum = max, Value = val, Parent = this };
-            tb.Scroll += (s, e) => { act(tb.Value); RefreshX(); };
-            y += 75;
+            // Masaüstü yolunu alıyoruz
+            string shortcutPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Crosshair.lnk");
+
+            // Eğer kısayol yoksa oluştur
+            if (!System.IO.File.Exists(shortcutPath))
+            {
+                WshShell shell = new WshShell();
+                IWshShortcut shortcut = (IWshShortcut)shell.CreateShortcut(shortcutPath);
+
+                shortcut.Description = "Zeki'nin Crosshair Uygulaması";
+                shortcut.TargetPath = Application.ExecutablePath; 
+                shortcut.WorkingDirectory = Application.StartupPath;
+                shortcut.Save();
+            }
         }
 
-        private void RefreshX() { foreach (Form f in Application.OpenForms) if (f is Form1) f.Invalidate(); }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            int x = Screen.PrimaryScreen.Bounds.Width / 2;
+            int y = Screen.PrimaryScreen.Bounds.Height / 2;
 
-        // Formu Yuvarlak Köşeli Yapma (GDI32)
-        [DllImport("Gdi32.dll", EntryPoint = "CreateRoundRectRgn")]
-        private static extern IntPtr CreateRoundRectRgn(int nLeftRect, int nTopRect, int nRightRect, int nBottomRect, int nWidthEllipse, int nHeightEllipse);
-        protected override void OnLoad(EventArgs e) { base.OnLoad(e); this.Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, Width, Height, 30, 30)); }
+            using (Pen p = new Pen(CColor, CThick))
+            using (Pen s = new Pen(Color.FromArgb(160, 0, 0, 0), CThick + 2))
+            {
+                if (CMode == 0 || CMode == 4)
+                {
+                    if (CMode != 4) DrawL(e.Graphics, p, s, x, y - CGap, x, y - CGap - CSize);
+                    DrawL(e.Graphics, p, s, x, y + CGap, x, y + CGap + CSize);
+                    DrawL(e.Graphics, p, s, x - CGap, y, x - CGap - CSize, y);
+                    DrawL(e.Graphics, p, s, x + CGap, y, x + CGap + CSize, y);
+                }
+                else if (CMode == 1)
+                {
+                    e.Graphics.FillEllipse(Brushes.Black, x - CThick - 1, y - CThick - 1, (CThick + 1) * 2, (CThick + 1) * 2);
+                    e.Graphics.FillEllipse(new SolidBrush(CColor), x - CThick, y - CThick, CThick * 2, CThick * 2);
+                }
+                else if (CMode == 2)
+                {
+                    e.Graphics.DrawRectangle(s, x - CGap, y - CGap, CGap * 2, CGap * 2);
+                    e.Graphics.DrawRectangle(p, x - CGap, y - CGap, CGap * 2, CGap * 2);
+                }
+            }
+        }
+
+        private void DrawL(Graphics g, Pen p, Pen s, int x1, int y1, int x2, int y2)
+        {
+            if (COutline) g.DrawLine(s, x1, y1, x2, y2);
+            g.DrawLine(p, x1, y1, x2, y2);
+        }
+
+        protected override void OnLoad(EventArgs e) 
+        { 
+            base.OnLoad(e); 
+            SetWindowLong(this.Handle, -20, GetWindowLong(this.Handle, -20) | 0x80000 | 0x20); 
+        }
     }
 }
